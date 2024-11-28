@@ -3,7 +3,7 @@ package gui
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"regexp"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -11,7 +11,43 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+var nameValidationRegex = regexp.MustCompile(`^[а-яА-Яa-zA-Z]+$`)
+var phoneValidationRegex = regexp.MustCompile(`^[0-9]+$`)
 var currentClientID int
+
+func createValidatedEntry(placeHolder string, parentWindow fyne.Window) *widget.Entry {
+	entry := widget.NewEntry()
+	entry.SetPlaceHolder(placeHolder)
+
+	entry.OnChanged = func(input string) {
+		if !nameValidationRegex.MatchString(input) && input != "" {
+			entry.SetText(input[:len(input)-1]) // Удаляем последний символ
+			dialog.ShowError(
+				fmt.Errorf("поле '%s' может содержать только буквы", placeHolder),
+				parentWindow,
+			)
+		}
+	}
+
+	return entry
+}
+
+func createPhoneValidatedEntry(placeHolder string, parentWindow fyne.Window) *widget.Entry {
+	entry := widget.NewEntry()
+	entry.SetPlaceHolder(placeHolder)
+
+	entry.OnChanged = func(input string) {
+		if !phoneValidationRegex.MatchString(input) && input != "" {
+			entry.SetText(input[:len(input)-1]) // Удаляем последний символ
+			dialog.ShowError(
+				fmt.Errorf("поле '%s' может содержать только цифры", placeHolder),
+				parentWindow,
+			)
+		}
+	}
+
+	return entry
+}
 
 func StartClientGUI(database *sql.DB, app fyne.App) {
 	clientWindow := app.NewWindow("Клиент: Главная")
@@ -141,6 +177,7 @@ func openClientLogin(database *sql.DB, app fyne.App) {
 
 	registerButton := widget.NewButton("Зарегистрироваться", func() {
 		openClientRegister(database, app)
+		loginWindow.Close()
 	})
 
 	loginWindow.SetContent(container.NewVBox(
@@ -159,35 +196,37 @@ func openClientRegister(database *sql.DB, app fyne.App) {
 	registerWindow := app.NewWindow("Клиент: Регистрация")
 	registerWindow.Resize(fyne.NewSize(400, 400))
 
-	nameEntry := widget.NewEntry()
-	nameEntry.SetPlaceHolder("Имя")
-	lastNameEntry := widget.NewEntry()
-	lastNameEntry.SetPlaceHolder("Фамилия")
-	phoneEntry := widget.NewEntry()
-	phoneEntry.SetPlaceHolder("Телефон")
+	nameEntry := createValidatedEntry("Имя", registerWindow)
+	lastNameEntry := createValidatedEntry("Фамилия", registerWindow)
+	phoneEntry := createPhoneValidatedEntry("Телефон", registerWindow) // Используем проверку телефона
 	loginEntry := widget.NewEntry()
 	loginEntry.SetPlaceHolder("Логин")
 	passwordEntry := widget.NewPasswordEntry()
 	passwordEntry.SetPlaceHolder("Пароль")
 
 	registerButton := widget.NewButton("Зарегистрироваться", func() {
-		name, lastName, phone, login, password := nameEntry.Text, lastNameEntry.Text, phoneEntry.Text, loginEntry.Text, passwordEntry.Text
+		name := nameEntry.Text
+		lastName := lastNameEntry.Text
+		phone := phoneEntry.Text
+		login := loginEntry.Text
+		password := passwordEntry.Text
 
 		if name == "" || lastName == "" || phone == "" || login == "" || password == "" {
-			dialog.ShowError(fmt.Errorf("все поля должны быть заполнены"), nil)
+			dialog.ShowError(fmt.Errorf("все поля должны быть заполнены"), registerWindow)
 			return
 		}
 
-		_, err := database.Exec("INSERT INTO Client (Name, LastName, Phone, Login, Password) VALUES (?, ?, ?, ?, ?)", name, lastName, phone, login, password)
+		_, err := database.Exec(
+			"INSERT INTO Client (Name, LastName, Phone, Login, Password) VALUES (?, ?, ?, ?, ?)",
+			name, lastName, phone, login, password,
+		)
 		if err != nil {
-			log.Println("Ошибка регистрации:", err)
-			dialog.ShowError(fmt.Errorf("ошибка при регистрации (пользователь с таким логином уже существует)"), registerWindow)
+			dialog.ShowError(fmt.Errorf("ошибка при регистрации"), registerWindow)
 			return
 		}
 
 		dialog.ShowInformation("Регистрация успешна", "Теперь вы можете войти", registerWindow)
 		registerWindow.Close()
-		openClientLogin(database, app)
 	})
 
 	registerWindow.SetContent(container.NewVBox(
@@ -202,5 +241,3 @@ func openClientRegister(database *sql.DB, app fyne.App) {
 
 	registerWindow.Show()
 }
-
-// StartClientGUI запускает интерфейс клиента
