@@ -55,31 +55,68 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 
 	// Кнопки функционала клиента
 	browseCarsButton := widget.NewButton("Просмотр автомобилей", func() {
-		rows, _ := database.Query("SELECT Brand, Model, YearOfRelease, Price FROM Cars")
-
+		dialog.ShowInformation("Важная информация", "Для того чтобы купить автомобиль просто нажмите на него", clientWindow)
+		rows, err := database.Query("SELECT ID_Car, Brand, Model, YearOfRelease, Price FROM Cars")
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("ошибка при загрузке списка автомобилей: %v", err), clientWindow)
+			return
+		}
 		defer rows.Close()
 
 		var cars []string
+		var carIDs []int
 		for rows.Next() {
+			var id int
 			var brand, model string
 			var year int
 			var price float64
-			if err := rows.Scan(&brand, &model, &year, &price); err == nil {
+			if err := rows.Scan(&id, &brand, &model, &year, &price); err == nil {
 				carDetails := fmt.Sprintf("%s %s - %d, Цена: %.2f", brand, model, year, price)
 				cars = append(cars, carDetails)
+				carIDs = append(carIDs, id)
 			}
 		}
 
-		carList := widget.NewList(
-			func() int { return len(cars) },
-			func() fyne.CanvasObject { return widget.NewLabel("Купить") },
-			func(i widget.ListItemID, obj fyne.CanvasObject) {
-				obj.(*widget.Label).SetText(cars[i])
-			},
-		)
+		if len(cars) == 0 {
+			dialog.ShowInformation("Список пуст", "Автомобили отсутствуют.", clientWindow)
+			return
+		}
 
+		// Создаем виджеты для каждого автомобиля
+		var carWidgets []fyne.CanvasObject
+		for i, car := range cars {
+			index := i // Создаём копию переменной, чтобы избежать проблем с замыканием
+			carButton := widget.NewButton(fmt.Sprintf("Купить: %s", car), func() {
+				carID := carIDs[index]
+				var price float64
+				err := database.QueryRow("SELECT Price FROM Cars WHERE ID_Car = ?", carID).Scan(&price)
+				if err != nil {
+					dialog.ShowError(fmt.Errorf("ошибка при получении цены: %v", err), clientWindow)
+					return
+				}
+
+				// Вставка данных в таблицу Checks
+				_, err = database.Exec(
+					"INSERT INTO Checks (ID_Client, ID_Car, ID_Admin, Price) VALUES (?, ?, NULL, ?)",
+					currentClientID, carID, price,
+				)
+				if err != nil {
+					dialog.ShowError(fmt.Errorf("ошибка при добавлении чека: %v", err), clientWindow)
+					return
+				}
+
+				// Сообщение об успешной покупке
+				dialog.ShowInformation("Успешная покупка", "Автомобиль успешно куплен!", clientWindow)
+			})
+			carWidgets = append(carWidgets, carButton)
+		}
+
+		// Создаем контейнер для списка автомобилей
+		carList := container.NewVBox(carWidgets...)
+
+		// Открываем всплывающее окно с прокручиваемым списком автомобилей
 		popup := app.NewWindow("Список автомобилей")
-		popup.SetContent(container.NewMax(carList))
+		popup.SetContent(container.NewVScroll(carList))
 		popup.Resize(fyne.NewSize(400, 300))
 		popup.Show()
 	})
@@ -132,17 +169,12 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 		popup.Show()
 
 	})
-	addFundsButton := widget.NewButton("Пополнить баланс", func() {
-		// Реализация пополнения баланса
-
-	})
 
 	// Размещение кнопок
 	clientWindow.SetContent(container.NewVBox(
 		widget.NewLabel("Добро пожаловать, Клиент!"),
 		browseCarsButton,
 		purchaseHistoryButton,
-		addFundsButton,
 	))
 
 	clientWindow.Show()

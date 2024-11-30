@@ -21,7 +21,7 @@ func StartMainGUI(database *sql.DB) {
 		mainWindow.Close()
 	})
 	adminButton := widget.NewButton("Войти как Администратор", func() {
-		StartAdminGUI(database, application)
+		openAdminLogin(database, application)
 		mainWindow.Close()
 	})
 
