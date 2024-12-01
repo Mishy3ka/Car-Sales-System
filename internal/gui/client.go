@@ -122,15 +122,13 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 	})
 
 	purchaseHistoryButton := widget.NewButton("История покупок", func() {
-
-		// Реализация истории покупок
-
 		rows, err := database.Query(`
-        SELECT c.Brand, c.Model, c.YearOfRelease, chk.Price
-        FROM Checks chk
-        JOIN Cars c ON chk.ID_Car = c.ID_Car
-        WHERE chk.ID_Client = ?
-    `, currentClientID) // Используем ID текущего клиента
+			SELECT c.Brand, c.Model, c.YearOfRelease, chk.Price
+			FROM Checks chk
+			LEFT JOIN Cars c ON chk.ID_Car = c.ID_Car
+			WHERE chk.ID_Client = ?
+			  AND (c.IsArchived = FALSE OR c.IsArchived = TRUE OR c.ID_Car IS NULL)
+		`, currentClientID)
 		if err != nil {
 			fyne.CurrentApp().SendNotification(&fyne.Notification{
 				Title:   "Ошибка",
@@ -143,11 +141,16 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 		var purchases []string
 		for rows.Next() {
 			var brand, model string
-			var year int
+			var year sql.NullInt32
 			var price float64
 			if err := rows.Scan(&brand, &model, &year, &price); err == nil {
-				purchase := fmt.Sprintf("%s %s (%d), Цена: %.2f", brand, model, year, price)
-				purchases = append(purchases, purchase)
+				if year.Valid {
+					purchase := fmt.Sprintf("%s %s (%d), Цена: %.2f", brand, model, year.Int32, price)
+					purchases = append(purchases, purchase)
+				} else {
+					purchase := fmt.Sprintf("%s %s (удалено из базы), Цена: %.2f", brand, model, price)
+					purchases = append(purchases, purchase)
+				}
 			}
 		}
 
@@ -167,7 +170,6 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 		popup.SetContent(container.NewMax(purchaseList))
 		popup.Resize(fyne.NewSize(400, 300))
 		popup.Show()
-
 	})
 
 	// Размещение кнопок

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -74,21 +75,116 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 
 		addCarWindow.Show()
 	})
-	confirmCheckButton := widget.NewButton("Подтвердить чек", func() {
-		// Реализация подтверждения чеков
-	})
+
 	deleteClientButton := widget.NewButton("Удалить пользователя", func() {
-		// Реализация удаления клиента
+		openDeleteClientWindow(database, app)
 	})
+
+	deleteCarButton := widget.NewButton("Удалить автомобиль", func() { //Удаление автомобиля из базы данных
+
+		rows, err := database.Query(`SELECT ID_Car, Brand, Model FROM Cars WHERE IsArchived = FALSE`)
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("ошибка получения списка автомобилей: %v", err), adminWindow)
+			return
+		}
+		defer rows.Close()
+
+		var carList []string
+		var carIDs []int
+		for rows.Next() {
+			var id int
+			var brand, model string
+			if err := rows.Scan(&id, &brand, &model); err == nil {
+				carList = append(carList, fmt.Sprintf("%s %s", brand, model))
+				carIDs = append(carIDs, id)
+			}
+		}
+
+		if len(carList) == 0 {
+			dialog.ShowInformation("Информация", "нет доступных автомобилей для удаления.", adminWindow)
+			return
+		}
+
+		carSelect := widget.NewSelect(carList, func(selected string) {
+			for i, car := range carList {
+				if car == selected {
+					_, err := database.Exec(`UPDATE Cars SET IsArchived = TRUE WHERE ID_Car = ?`, carIDs[i])
+					if err != nil {
+						dialog.ShowError(fmt.Errorf("ошибка архивации автомобиля: %v", err), adminWindow)
+					} else {
+						dialog.ShowInformation("успех", "автомобиль успешно архивирован.", adminWindow)
+					}
+					return
+				}
+			}
+		})
+
+		popup := app.NewWindow("Архивация автомобиля")
+		popup.SetContent(container.NewVBox(
+			widget.NewLabel("Выберите автомобиль для архивации:"),
+			carSelect,
+			widget.NewButton("Закрыть", func() { popup.Close() }),
+		))
+		popup.Resize(fyne.NewSize(400, 200))
+		popup.Show()
+	})
+
 	analyzeButton := widget.NewButton("Анализ продаж", func() {
-		// Реализация анализа продаж
+		// SQL-запрос для анализа продаж
+		rows, err := database.Query(`
+			SELECT 
+				Cars.Brand, 
+				Cars.Model, 
+				SUM(Checks.Price) AS TotalRevenue, 
+				COUNT(Checks.ID_Check) AS TotalSales
+			FROM Cars
+			JOIN Checks ON Cars.ID_Car = Checks.ID_Car
+			WHERE Cars.IsArchived = FALSE
+			GROUP BY Cars.ID_Car
+			ORDER BY TotalSales DESC
+			LIMIT 3;
+		`)
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("ошибка анализа продаж: %v", err), adminWindow)
+			return
+		}
+		defer rows.Close()
+
+		// Формируем список результатов
+		var results []string
+		for rows.Next() {
+			var brand, model string
+			var totalRevenue float64
+			var totalSales int
+			if err := rows.Scan(&brand, &model, &totalRevenue, &totalSales); err == nil {
+				results = append(results, fmt.Sprintf("%s %s: продаж: %d ,  доход: %.2f", brand, model, totalSales, totalRevenue))
+			}
+		}
+
+		// Проверяем, есть ли результаты
+		if len(results) == 0 {
+			dialog.ShowInformation("Результаты анализа", "Продаж пока нет", adminWindow)
+			return
+		}
+
+		// Отображаем результаты в новом окне
+		resultsWindow := app.NewWindow("Результаты анализа")
+		resultsWindow.Resize(fyne.NewSize(400, 300))
+		resultsWindow.SetContent(container.NewVBox(
+			widget.NewLabel("Топ-3 самых продаваемых автомобиля:"),
+			widget.NewLabel(strings.Join(results, "\n")),
+			widget.NewButton("Закрыть", func() {
+				resultsWindow.Close()
+			}),
+		))
+		resultsWindow.Show()
 	})
 
 	// Размещение кнопок
 	adminWindow.SetContent(container.NewVBox(
 		widget.NewLabel("Добро пожаловать, Администратор!"),
 		addCarButton,
-		confirmCheckButton,
+		deleteCarButton,
 		deleteClientButton,
 		analyzeButton,
 	))
@@ -154,4 +250,75 @@ func CreateValidatedEntry(placeHolder string, parentWindow fyne.Window, pattern 
 	}
 
 	return entry
+}
+
+func openDeleteClientWindow(database *sql.DB, app fyne.App) {
+	deleteClientWindow := app.NewWindow("Удалить пользователя")
+	deleteClientWindow.Resize(fyne.NewSize(400, 300))
+
+	// Получение списка пользователей из базы данных
+	rows, err := database.Query("SELECT ID_Client, Name, LastName FROM Client")
+	if err != nil {
+		dialog.ShowError(fmt.Errorf("ошибка получения пользователей: %v", err), deleteClientWindow)
+		return
+	}
+	defer rows.Close()
+
+	var clients []string
+	clientMap := make(map[string]int)
+
+	for rows.Next() {
+		var id int
+		var name, lastName string
+		if err := rows.Scan(&id, &name, &lastName); err == nil {
+			clientLabel := fmt.Sprintf("%s %s (ID: %d)", name, lastName, id)
+			clients = append(clients, clientLabel)
+			clientMap[clientLabel] = id
+		}
+	}
+
+	if len(clients) == 0 {
+		dialog.ShowInformation("Информация", "Нет пользователей для удаления", deleteClientWindow)
+		return
+	}
+
+	clientSelect := widget.NewSelect(clients, func(selected string) {})
+	clientSelect.PlaceHolder = "Выберите пользователя"
+
+	deleteButton := widget.NewButton("Удалить", func() {
+		selectedClient := clientSelect.Selected
+		if selectedClient == "" {
+			dialog.ShowError(fmt.Errorf("пользователь не выбран"), deleteClientWindow)
+			return
+		}
+
+		clientID := clientMap[selectedClient]
+
+		// Удаление пользователя и его чеков из базы данных
+		_, err := database.Exec("DELETE FROM Checks WHERE ID_Client = ?", clientID)
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("ошибка удаления чеков пользователя: %v", err), deleteClientWindow)
+			return
+		}
+
+		_, err = database.Exec("DELETE FROM Client WHERE ID_Client = ?", clientID)
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("ошибка удаления пользователя: %v", err), deleteClientWindow)
+			return
+		}
+
+		dialog.ShowInformation("Успех", "Пользователь успешно удален", deleteClientWindow)
+	})
+
+	cancelButton := widget.NewButton("Отмена", func() {
+		deleteClientWindow.Close()
+	})
+
+	deleteClientWindow.SetContent(container.NewVBox(
+		widget.NewLabel("Выберите пользователя, которого хотите удалить:"),
+		clientSelect,
+		container.NewHBox(deleteButton, cancelButton),
+	))
+
+	deleteClientWindow.Show()
 }
