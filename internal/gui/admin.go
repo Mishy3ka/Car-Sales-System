@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -22,7 +23,7 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 	adminWindow.Resize(fyne.NewSize(600, 400))
 
 	// Кнопки функционала администратора
-	addCarButton := widget.NewButton("Добавить автомобиль", func() {
+	addCarButton := widget.NewButton("Добавить автомобиль", func() { // Функция доабвления автомобиля
 		// Реализация добавления автомобиля
 		addCarWindow := app.NewWindow("Добавить автомобиль")
 		addCarWindow.Resize(fyne.NewSize(400, 400))
@@ -41,12 +42,18 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 			color := colorEntry.Text
 			price := priceEntry.Text
 
+			yearInt, err := strconv.Atoi(year)
+			if err != nil || yearInt > 2024 || yearInt < 1970 {
+				dialog.ShowError(fmt.Errorf("ошибка: Год выпуска должен быть в диапазоне от 1970 до 2024"), addCarWindow)
+				return
+			}
+
 			if brand == "" || model == "" || year == "" || color == "" || price == "" {
 				dialog.ShowError(fmt.Errorf("все поля должны быть заполнены"), addCarWindow)
 				return
 			}
 
-			_, err := database.Exec(
+			_, err = database.Exec(
 				"INSERT INTO Cars (Brand, Model, YearOfRelease, Color, Price) VALUES (?, ?, ?, ?, ?)",
 				brand, model, year, color, price,
 			)
@@ -110,9 +117,9 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 				if car == selected {
 					_, err := database.Exec(`UPDATE Cars SET IsArchived = TRUE WHERE ID_Car = ?`, carIDs[i])
 					if err != nil {
-						dialog.ShowError(fmt.Errorf("ошибка архивации автомобиля: %v", err), adminWindow)
+						dialog.ShowError(fmt.Errorf("ошибка удаления автомобиля: %v", err), adminWindow)
 					} else {
-						dialog.ShowInformation("успех", "автомобиль успешно архивирован.", adminWindow)
+						dialog.ShowInformation("успех", "автомобиль успешно удален.", adminWindow)
 					}
 					return
 				}
@@ -121,7 +128,7 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 
 		popup := app.NewWindow("Архивация автомобиля")
 		popup.SetContent(container.NewVBox(
-			widget.NewLabel("Выберите автомобиль для архивации:"),
+			widget.NewLabel("Выберите автомобиль для удаления:"),
 			carSelect,
 			widget.NewButton("Закрыть", func() { popup.Close() }),
 		))
@@ -129,7 +136,7 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 		popup.Show()
 	})
 
-	analyzeButton := widget.NewButton("Анализ продаж", func() {
+	analyzeButton := widget.NewButton("Анализ продаж", func() { //Функция для анализа продаж
 		// SQL-запрос для анализа продаж
 		rows, err := database.Query(`
 			SELECT 
@@ -192,7 +199,7 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 	adminWindow.Show()
 }
 
-func openAdminLogin(database *sql.DB, app fyne.App) {
+func openAdminLogin(database *sql.DB, app fyne.App) { //функция входа в систему для админа
 	loginWindow := app.NewWindow("Админ: вход")
 	loginWindow.Resize(fyne.NewSize(300, 300))
 
@@ -229,7 +236,7 @@ func openAdminLogin(database *sql.DB, app fyne.App) {
 	loginWindow.Show()
 }
 
-func CreateValidatedEntry(placeHolder string, parentWindow fyne.Window, pattern string, errorMessage string) *widget.Entry {
+func CreateValidatedEntry(placeHolder string, parentWindow fyne.Window, pattern string, errorMessage string) *widget.Entry { //Функцция проверки вводимых символов
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder(placeHolder)
 
@@ -252,7 +259,7 @@ func CreateValidatedEntry(placeHolder string, parentWindow fyne.Window, pattern 
 	return entry
 }
 
-func openDeleteClientWindow(database *sql.DB, app fyne.App) {
+func openDeleteClientWindow(database *sql.DB, app fyne.App) { //Функция удаления пользователя
 	deleteClientWindow := app.NewWindow("Удалить пользователя")
 	deleteClientWindow.Resize(fyne.NewSize(400, 300))
 

@@ -15,7 +15,7 @@ var nameValidationRegex = regexp.MustCompile(`^[а-яА-Яa-zA-Z]+$`)
 var phoneValidationRegex = regexp.MustCompile(`^[0-9]+$`)
 var currentClientID int
 
-func createValidatedEntry(placeHolder string, parentWindow fyne.Window) *widget.Entry {
+func createValidatedEntry(placeHolder string, parentWindow fyne.Window) *widget.Entry { //Функция проверки вводимых символов
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder(placeHolder)
 
@@ -32,7 +32,7 @@ func createValidatedEntry(placeHolder string, parentWindow fyne.Window) *widget.
 	return entry
 }
 
-func createPhoneValidatedEntry(placeHolder string, parentWindow fyne.Window) *widget.Entry {
+func createPhoneValidatedEntry(placeHolder string, parentWindow fyne.Window) *widget.Entry { //Функция проверки вводимых символов
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder(placeHolder)
 
@@ -54,7 +54,7 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 	clientWindow.Resize(fyne.NewSize(600, 400))
 
 	// Кнопки функционала клиента
-	browseCarsButton := widget.NewButton("Просмотр автомобилей", func() {
+	browseCarsButton := widget.NewButton("Просмотр автомобилей", func() { // фукнция для просмотра и покупки автомобилей
 		dialog.ShowInformation("Важная информация", "Для того чтобы купить автомобиль просто нажмите на него", clientWindow)
 		rows, err := database.Query("SELECT ID_Car, Brand, Model, YearOfRelease, Price FROM Cars")
 		if err != nil {
@@ -182,7 +182,7 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 	clientWindow.Show()
 }
 
-func openClientLogin(database *sql.DB, app fyne.App) {
+func openClientLogin(database *sql.DB, app fyne.App) { //функция входа для клиента
 	loginWindow := app.NewWindow("Клиент: Вход")
 	loginWindow.Resize(fyne.NewSize(400, 300))
 
@@ -211,7 +211,7 @@ func openClientLogin(database *sql.DB, app fyne.App) {
 
 	registerButton := widget.NewButton("Зарегистрироваться", func() {
 		openClientRegister(database, app)
-		loginWindow.Close()
+
 	})
 
 	loginWindow.SetContent(container.NewVBox(
@@ -225,8 +225,7 @@ func openClientLogin(database *sql.DB, app fyne.App) {
 	loginWindow.Show()
 }
 
-// openClientRegister открывает окно для регистрации клиента
-func openClientRegister(database *sql.DB, app fyne.App) {
+func openClientRegister(database *sql.DB, app fyne.App) { //Фукнция регистрации для клиента
 	registerWindow := app.NewWindow("Клиент: Регистрация")
 	registerWindow.Resize(fyne.NewSize(400, 400))
 
@@ -261,6 +260,7 @@ func openClientRegister(database *sql.DB, app fyne.App) {
 
 		dialog.ShowInformation("Регистрация успешна", "Теперь вы можете войти", registerWindow)
 		registerWindow.Close()
+
 	})
 
 	registerWindow.SetContent(container.NewVBox(
