@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -86,7 +87,7 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 		var carWidgets []fyne.CanvasObject
 		for i, car := range cars {
 			index := i // Создаём копию переменной, чтобы избежать проблем с замыканием
-			carButton := widget.NewButton(fmt.Sprintf("Купить: %s", car), func() {
+			carButton := widget.NewButton(fmt.Sprintf("Купить: %s Р", car), func() {
 				carID := carIDs[index]
 				var price float64
 				err := database.QueryRow("SELECT Price FROM Cars WHERE ID_Car = ?", carID).Scan(&price)
@@ -121,7 +122,7 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 		popup.Show()
 	})
 
-	purchaseHistoryButton := widget.NewButton("История покупок", func() {
+	purchaseHistoryButton := widget.NewButton("История покупок", func() { // Фукнция которая показывает историю покупок клиента
 		rows, err := database.Query(`
 			SELECT c.Brand, c.Model, c.YearOfRelease, chk.Price
 			FROM Checks chk
@@ -145,7 +146,7 @@ func StartClientGUI(database *sql.DB, app fyne.App) {
 			var price float64
 			if err := rows.Scan(&brand, &model, &year, &price); err == nil {
 				if year.Valid {
-					purchase := fmt.Sprintf("%s %s (%d), Цена: %.2f", brand, model, year.Int32, price)
+					purchase := fmt.Sprintf("%s %s (%d), Цена: %.2f Р", brand, model, year.Int32, price)
 					purchases = append(purchases, purchase)
 				} else {
 					purchase := fmt.Sprintf("%s %s (удалено из базы), Цена: %.2f", brand, model, price)
@@ -194,6 +195,10 @@ func openClientLogin(database *sql.DB, app fyne.App) { //функция вход
 	loginButton := widget.NewButton("Войти", func() {
 		login := loginEntry.Text
 		password := passwordEntry.Text
+
+		if login == "" || password == "" {
+			dialog.ShowError(fmt.Errorf("все поля должны быть заполнены"), loginWindow)
+		}
 
 		var id int
 		err := database.QueryRow("SELECT ID_Client FROM Client WHERE Login = ? AND Password = ?", login, password).Scan(&id)
@@ -259,6 +264,7 @@ func openClientRegister(database *sql.DB, app fyne.App) { //Фукнция ре�
 		}
 
 		dialog.ShowInformation("Регистрация успешна", "Теперь вы можете войти", registerWindow)
+		time.Sleep(10 * time.Second)
 		registerWindow.Close()
 
 	})

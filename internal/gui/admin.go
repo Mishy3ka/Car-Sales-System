@@ -164,7 +164,7 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 			var totalRevenue float64
 			var totalSales int
 			if err := rows.Scan(&brand, &model, &totalRevenue, &totalSales); err == nil {
-				results = append(results, fmt.Sprintf("%s %s: продаж: %d ,  доход: %.2f", brand, model, totalSales, totalRevenue))
+				results = append(results, fmt.Sprintf("%s %s: продаж: %d ,  доход: %.2f Р", brand, model, totalSales, totalRevenue))
 			}
 		}
 
