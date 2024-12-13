@@ -264,7 +264,7 @@ func openClientRegister(database *sql.DB, app fyne.App) { //Фукнция ре�
 		}
 
 		dialog.ShowInformation("Регистрация успешна", "Теперь вы можете войти", registerWindow)
-		time.Sleep(10 * time.Second)
+		time.Sleep(2 * time.Second)
 		registerWindow.Close()
 
 	})

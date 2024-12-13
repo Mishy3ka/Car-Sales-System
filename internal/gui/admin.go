@@ -126,7 +126,7 @@ func StartAdminGUI(database *sql.DB, app fyne.App) {
 			}
 		})
 
-		popup := app.NewWindow("Архивация автомобиля")
+		popup := app.NewWindow("Удаление автомобиля")
 		popup.SetContent(container.NewVBox(
 			widget.NewLabel("Выберите автомобиль для удаления:"),
 			carSelect,
